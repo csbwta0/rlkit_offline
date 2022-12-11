@@ -16,7 +16,7 @@ import json
 import pickle
 import errno
 import torch
-
+from torch.utils.tensorboard import SummaryWriter
 from rlkit.core.tabulate import tabulate
 from collections import OrderedDict
 
@@ -105,7 +105,9 @@ class Logger(object):
         self._log_tabular_only = False
         self._header_printed = False
         self.table_printer = TerminalTablePrinter()
-
+        
+        self.writer = []
+        self.writer_epoch = -1
     def reset(self):
         self.__init__()
 
@@ -146,6 +148,12 @@ class Logger(object):
             self._tabular_header_written.remove(self._tabular_fds[file_name])
         self._remove_output(file_name, self._tabular_outputs, self._tabular_fds)
 
+    def add_tensorboard_output(self,file_name):
+        self.writer = SummaryWriter(file_name)
+    
+    def record_tensorboard(self,k,v):
+        self.writer.add_scalar(tag=k,scalar_value=v,global_step=self.writer_epoch)
+        pass
     def set_snapshot_dir(self, dir_name):
         self._snapshot_dir = dir_name
 
@@ -190,10 +198,15 @@ class Logger(object):
         self._tabular.append((self._tabular_prefix_str + str(key), str(val)))
 
     def record_dict(self, d, prefix=None):
+        if prefix is None:
+            if 'epoch' in d:
+                self.writer_epoch += 1
         if prefix is not None:
             self.push_tabular_prefix(prefix)
         for k, v in d.items():
             self.record_tabular(k, v)
+            if prefix is not None:
+                self.record_tensorboard(prefix+k,v)
         if prefix is not None:
             self.pop_tabular_prefix()
 
